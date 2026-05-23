@@ -22,7 +22,7 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<{ message: string }> {
+  async register(dto: RegisterDto): Promise<{ message: string; user: any }> {
     const { nom, prenom, email, telephone, mot_de_passe } = dto;
 
     const mot_de_passe_hash = await bcrypt.hash(mot_de_passe, 10);
@@ -31,15 +31,22 @@ export class AuthService {
     const user = await this.userService.create({ email, mot_de_passe_hash });
 
     // 2. Créer le profil client avec les données du formulaire
-    await this.clientProfilService.create(user, { nom, prenom, telephone });
+    const profil=  await this.clientProfilService.create(user, { nom, prenom, telephone });
 
     // 3. Générer et envoyer l'OTP par mail
     const otp = await this.otpService.generer(user);
+
+      const {mot_de_passe_hash: _, ...userData} = user;
 
     // TODO: MailService.envoyerOtp(user.email, otp.code)
 
     return {
       message: 'Compte créé. Vérifiez votre boîte mail pour activer votre compte.',
+      user: {
+        ...userData,
+        profil,
+           
+      }
     };
   }
 
@@ -62,7 +69,7 @@ export class AuthService {
     return { message: 'Compte activé. Vous pouvez maintenant vous connecter.' };
   }
 
-  async login(dto: LoginDto): Promise<{ access_token: string; role: string }> {
+  async login(dto: LoginDto): Promise<{ access_token: string; user: any }> {
     const { email, mot_de_passe } = dto;
 
     const user = await this.userService.findByEmail(email);
@@ -82,6 +89,11 @@ export class AuthService {
     const payload = { sub: user.user_id, email: user.email, role: user.role };
     const access_token = await this.jwtService.signAsync(payload);
 
-    return { access_token, role: user.role };
+      const {mot_de_passe_hash: _, ...userData} = user;
+
+    return { 
+      access_token, 
+      user:userData,
+      };
   }
 }
